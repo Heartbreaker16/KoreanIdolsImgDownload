@@ -1,6 +1,6 @@
-const request = require('request')
 const fs = require('fs')
 const https = require('https')
+let writingTxt = false
 
 function getImgListFromHTML(HTMLpath) {
   return new Promise(resolve => {
@@ -8,7 +8,10 @@ function getImgListFromHTML(HTMLpath) {
     fs.readFile(HTMLpath, (err, data) => {
       if (err) throw err
       const imgArr = data.toString().match(imgREG).map(v => v.replace('src=', '').replace(/"/g, '').split('?type=')[0])
-      resolve(imgArr)
+      fs.writeFile('./downloadList.txt', imgArr.join('\n'), err => {
+        if (err) throw err
+        resolve(imgArr)
+      })
     })
   })
 }
@@ -27,6 +30,21 @@ function downloadImg(src) {
     })
   })
 }
+function writeDownloadList(str){
+  const path = './downloadList.txt'
+  if(writingTxt){
+    setTimeout(() => writeDownloadList(str), 200)
+  } else {
+    writingTxt = true
+    fs.readFile(path, 'utf8', (err, data) => {
+      if (err) throw err
+      fs.writeFile(path, data.replace(str,''), err => {
+        if (err) throw err
+        writingTxt = false
+      })
+    })
+  }
+}
 function sleep(ms) { //暂停，防止高并发请求导致被屏蔽
   return new Promise(resolve => {
     for (var t = Date.now(); Date.now() - t <= ms; );
@@ -39,6 +57,7 @@ function app() {
     for (let i = 0; i < imgArr.length; i++) {
       sleep((Date.now() + Math.random * 1050) % 2000).then(() =>
         downloadImg(imgArr[i]).then(() => {
+          writeDownloadList(imgArr[i]+'\n')
           console.log(`第${i + 1}张图片下载成功,还剩${--imgNumLeft}张`)
         })
       )
